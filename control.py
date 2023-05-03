@@ -31,6 +31,13 @@ import logging, threading, time
 # custom stuff
 import angle_position, tof_position
 
+import serial
+import time
+import numpy as np
+
+import serial
+import RPi.GPIO as GPIO
+
 """
 THREAD ONE
 drive the PWMs and scan for serial and hes inputs
@@ -38,3 +45,28 @@ drive the PWMs and scan for serial and hes inputs
 
 
 
+# angle loc info (a_ prefix)
+a_port = 0
+a_ser = serial.Serial('/dev/ttyACM'+str(port),9600,timeout=5)#8,'N',1,timeout=1)
+
+while True:
+	line = ser.readline()
+	if len(line) == 0:
+		print("Timeout")
+		sys.exit()
+	print(line)
+
+# read from io and deplex and save to arrays
+# 3 transmitter case
+def get_angle_arrs_3(window=100):
+	r0 = np.empty(window,dtype=int)
+	r1 = np.empty(window,dtype=int)
+	r2 = np.empty(window,dtype=int)
+	for (i=0;i<window;i+=1):
+		line = ser.readline()
+		if len(line) ==0:
+			print("angle receiver timeout")
+			sys.exit()
+		r0[i] = line
+		line = ser.readline()
+		
