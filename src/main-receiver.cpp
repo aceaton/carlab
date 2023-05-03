@@ -40,7 +40,6 @@ void loop() {
         //data = rx16.getData(0);
         uint16_t senderShortAddress = rx16.getRemoteAddress16();
 
-        if ()
         // Serial.print(" (");
         // Serial.print(senderShortAddress);
         // Serial.println(")");
