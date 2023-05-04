@@ -43,6 +43,9 @@ THREAD ONE
 drive the PWMs and scan for serial and hes inputs
 """
 
+# set up the GPIO in/out
+
+
 
 
 # angle loc info (a_ prefix)
@@ -58,15 +61,4 @@ while True:
 
 # read from io and deplex and save to arrays
 # 3 transmitter case
-def get_angle_arrs_3(window=100):
-	r0 = np.empty(window,dtype=int)
-	r1 = np.empty(window,dtype=int)
-	r2 = np.empty(window,dtype=int)
-	for (i=0;i<window;i+=1):
-		line = ser.readline()
-		if len(line) ==0:
-			print("angle receiver timeout")
-			sys.exit()
-		r0[i] = line
-		line = ser.readline()
-		
+
