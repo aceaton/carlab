@@ -27,7 +27,7 @@ it will require interrupts from the constant thread
 
 ''' IMPORTS ---------------------------------------------------------------------------------'''
 # generic stuff
-import logging, threading, time
+import logging, threading, time, atexit
 # custom stuff
 from angle_position import *
 from tof_position import *
@@ -72,17 +72,18 @@ milli = 1e-3
 
 device = XBeeDevice("/dev/ttyS0", 9600)
 
+ser = serial.Serial(port="/dev/ttyACM0",baudrate=115200) # use dmesg to figure out USB
 
 ''' CONFIGURABLE PARAMS (don't change) ------------------------------------------------------'''
 clp = .5
 arr_size = 200 # must be divisible by 2
 # PID coefficients (sc = speed control, st = steering)
-sc_p = 0
-sc_i = 0
-sc_d = 0
-st_p = 0
+sc_p = 60
+sc_i = 10
+sc_d = 5 # half as much?
+st_p = 0.008
 st_i = 0
-st_d = 0
+st_d = 0.008
 # starting dcs
 sc_starting_dc = 8
 st_starting_dc = 6
@@ -122,7 +123,14 @@ sc_int_err = 0
 # stuff for position control
 last_pos = [0,0]
 targ_pos = [50,50]
-
+mag_multiplier = .5 # half of the correction is influenced by distnace error (at a base distance of 1 ft)
+st_old_err = 0
+st_int_err = 0
+arrived=False
+# ttof calc pos
+just_use_tag = True
+pos_x=0
+pos_y=0
 
 ''' HELPERS AND CALLBACK FUNCTIONS ----------------------------------------------------------'''                
 def threaded_xbee_interface():
@@ -134,6 +142,29 @@ def threaded_xbee_interface():
     finally:
         if device is not None and device.is_open():
             device.close()
+
+def threaded_receive_position():
+    global pos_x
+    global pos_y
+    # setup board deacawave
+    ser.write("\r\r".encode()) # enter UART shell mode
+    time.sleep(1)
+    ser.write("lep\r".encode()) # start recieveing 
+    time.sleep(1)
+    
+    buffer_string = ''
+    while True:
+        buffer_string = buffer_string + ser.read(ser.inWaiting()).decode()
+        if '\n' in buffer_string:
+            lines = buffer_string.split('\n') # guaranteed at least 2
+            if lines[-2]:
+                data = lines[-2]
+                data = data.replace("\r\n","")
+                data = data.split(",")
+                if ("POS" in data):
+                    pos_x = data[data.index("POS")+1]
+                    pos_y = data[data.index("POS")+2]
+                buffer_string = lines[-1]           
 
 def halleff_callback():
     # copy logic here
@@ -167,9 +198,10 @@ def halleff_callback():
     calculated_dc = sc_starting_dc - (sc_p*err + sc_i*sc_int_err + sc_d*derr)
     if (calculated_dc > sc_max_dc):
          calculated_dc = sc_max_dc
-	if (calculated_dc < sc_min_dc):
+    if (calculated_dc < sc_min_dc):
          calculated_dc = sc_min_dc
-    pi_pwm.ChangeDutyCycle(calculated_dc)
+    if (not arrived)
+        pi_pwm.ChangeDutyCycle(calculated_dc)
     
 def xbee_packet_received_callback(packet):
     global i 
@@ -218,6 +250,8 @@ def xbee_packet_received_callback(packet):
         #print(time.time() - start)
 
 def get_location():
+    if just_use_tag:
+        return [pos_x,pos_y]
     array2_lock.acquire()
     array3_lock.acquire()
     array4_lock.acquire()
@@ -243,19 +277,59 @@ def start_system(): # main func
     # Create a new thread object
     xbee_thread = threading.Thread(target=threaded_xbee_interface)
     
+    uwb_thread = threading.Thread(target=threaded_receive_position)
+    uwb_thread.daemon = True
+    xbee_thread.daemon = True
+    uwb_thread.start()
+    xbee_thread.start()
+    
     GPIO.add_event_detect(halleff_in, GPIO.FALLING, callback=halleff_callback, bouncetime=200)
 
     while (1):
         # loop in here for pid for location
         # do pid
-		global last_pos
-		pos = get_location()
+        global last_pos
+        global st_old_err
+        global st_int_err
+
+        pos = get_location()
         # vec = [pos[0] - last_pos[0],pos[1]-last_pos[1]]
-		last_pos = pos
+        
     
-		# tvec = [targ_pos[0] - pos[0],targ_pos[1]-pos[1]]
-		mag = d(targ_pos,pos)
-		ang_err = ang(pos,targ_pos)
+        # tvec = [targ_pos[0] - pos[0],targ_pos[1]-pos[1]]
+        mag = d(pos,last_pos)
     
+        mag_to_go = d(targ_pos,pos)
+        if (mag_to_go < 1):
+            arrived=True
+    
+        ang_err = ang(last_pos,pos) - ang(pos,targ_pos)
+                
+        last_pos = pos
+                
+        mult = 1 - mag_multiplier + mag*mag_multiplier # multiplier to take into account speed ish
+        # could also just use speed directly
+        
+        # PID
+        st_int_err += ang_err
+        derr = ang_err-st_old_err
+        st_old_err = ang_err
+
+        # PID
+        calculated_dc = st_starting_dc - (st_p*ang_err + st_i*st_int_err + st_d*derr)
+        if (calculated_dc > st_max_dc):
+             calculated_dc = st_max_dc
+        if (calculated_dc < st_min_dc):
+             calculated_dc = st_min_dc
+        
+        if ( not arrived)
+            steer_pwm.ChangeDutyCycle(calculated_dc)
+
         # pi_pwm.ChangeDutyCycle(duty) #provide duty cycle in the range 0-100
         time.sleep(milli*loc_find_delay)
+    
+def cleanup():
+    print("Exiting")
+    ser.write("\r".encode())
+    ser.close()
+atexit.register(cleanup)
