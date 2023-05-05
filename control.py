@@ -56,11 +56,11 @@ motorpin = 12                # PWM pin connected to LED
 GPIO.setwarnings(False)            #disable warnings
 GPIO.setmode(GPIO.BOARD)        #set pin numbering system
 GPIO.setup(motorpin,GPIO.OUT)
-pi_pwm = GPIO.PWM(motorpin,1000)        #create PWM instance with frequency
+pi_pwm = GPIO.PWM(motorpin,100)        #create PWM instance with frequency
             #start PWM of required Duty Cycle 
 steerpin = 32
 GPIO.setup(steerpin,GPIO.OUT)
-steer_pwm = GPIO.PWM(steerpin,1000)
+steer_pwm = GPIO.PWM(steerpin,100)
 # FIGURE THIS OUT
 canpin = 15
 GPIO.setup(canpin,GPIO.OUT)
@@ -86,7 +86,7 @@ st_p = 0.008
 st_i = 0
 st_d = 0.008
 # starting dcs
-sc_starting_dc = 8
+sc_starting_dc = 35
 st_starting_dc = 6
 can_dc = 80
 # extreme dcs

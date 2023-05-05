@@ -64,7 +64,7 @@ motorpin = 23            # PWM pin connected to LED
 # pi_pwm = GPIO.PWM(motorpin,1000)        #create PWM instance with frequency
             #start PWM of required Duty Cycle 
 pi.set_mode(motorpin, pigpio.OUTPUT)
-pi.set_PWM_frequency(motorpin,1000)
+pi.set_PWM_frequency(motorpin,100)
 # gpioSetPullUpDown(18, PI_PUD_DOWN);
 pi.set_pull_up_down(motorpin, pigpio.PUD_DOWN)
 
@@ -72,11 +72,11 @@ steerpin = 13
 # GPIO.setup(steerpin,GPIO.OUT)
 # steer_pwm = GPIO.PWM(steerpin,1000)
 pi.set_mode(steerpin, pigpio.OUTPUT)
-pi.set_PWM_frequency(steerpin,1000)
+pi.set_PWM_frequency(steerpin,100)
 # FIGURE THIS OUT
 canpin = 22
 pi.set_mode(canpin, pigpio.OUTPUT)
-pi.set_PWM_frequency(canpin,1000)
+pi.set_PWM_frequency(canpin,100)
 
 
 # GPIO.output(canpin, GPIO.LOW)
@@ -96,19 +96,19 @@ ser = serial.Serial(port="/dev/ttyACM0",baudrate=115200) # use dmesg to figure o
 clp = .5
 arr_size = 100 # must be divisible by 2
 # PID coefficients (sc = speed control, st = steering)
-sc_p = .8
-sc_i = .05
+sc_p = .3
+sc_i = .000001
 sc_d = 0 # half as much?
 st_p = 0.008
 st_i = 0
 st_d = 0.008
 # starting dcs
-sc_starting_dc = 10
+sc_starting_dc = 20
 st_starting_dc = 15
 can_dc = 20
 # extreme dcs
-sc_max_dc = 100
-sc_min_dc = 0
+sc_max_dc = 80
+sc_min_dc = 3
 st_max_dc = 80
 st_min_dc = 0
 # speed control
@@ -119,7 +119,7 @@ loc_find_delay = 100
 # location of transmitters (in feet units?)
 t2_location = [14,8]
 t3_location = [21,11]
-t4_location = [25,7]
+t4_location = [25,6]
 
 pwm_mult = 2.55
 # pwm_mult = 10000
@@ -210,23 +210,24 @@ def halleff_callback(gpio,level,tick):
     diff = capture_val - old_capture_val
     old_capture_val = capture_val
     
-    if (rots==1 or rots==2):
+    if (rots==1 or rots==2 or diff>2):
         diff = 1/target_speed/hes_per_foot # this is the target time between hes
         
     # error based on speed in f/s
     err = 1/(diff*hes_per_foot) - target_speed
+    
     sc_int_err += err
     derr = err-sc_old_err
     sc_old_err = err
     print('speed: ' + str(1/(diff*hes_per_foot)) + ' err: ' + str(err) + ' interr: ' + str(sc_int_err) + ' derr: ' + str(derr))
-    
+
     # PID
     calculated_dc = sc_starting_dc - (sc_p*err + sc_i*sc_int_err + sc_d*derr)
     if (calculated_dc > sc_max_dc):
          calculated_dc = sc_max_dc
     if (calculated_dc < sc_min_dc):
          calculated_dc = sc_min_dc
-    print(calculated_dc)
+    print(int(calculated_dc*pwm_mult))
     if (not arrived):
         # print(calculated_dc)
         pi.set_PWM_dutycycle(motorpin, int(pwm_mult*calculated_dc))
@@ -332,11 +333,12 @@ def get_ang_2(r2,r3):
     plt.show()
     # print("PLOTTED")
 
-    ps1 = find_peaks(filt,distance=6,prominence=200)
+    ps1 = find_peaks(filt,distance=5,prominence=100)
     ps = ps1[0]
-    # print(ps)
+    print(len(ps))
     # ps = ps + len(b) - 1
     # print(ps)
+    print(len)
     diff = np.mean(np.diff(ps))
     # ps[1]-ps[0]
     perc = 1-ps[0]/(diff)
