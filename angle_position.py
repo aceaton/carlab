@@ -1,3 +1,4 @@
+from position_utils import *
 # using two numpy arrays of same len
 # gives t3 degrees clockwise from t2
 def get_ang_2(r2,r3):
@@ -37,6 +38,11 @@ def get_ang_2(r2,r3):
     # print(ps1[1])
     return perc
 
+def get_pos_ang_3(r2,r3,r4,p2,p3,p4):
+    a1 = get_ang_2(r2,r3)
+    a2 = get_ang_2(r3,r4)
+    return calc_ang_pos(p2,p3,p4,a1,a2)
+
 def get_angle_arrs_3(window=100):
 	r0 = np.empty(window,dtype=int)
 	r1 = np.empty(window,dtype=int)
@@ -48,4 +54,9 @@ def get_angle_arrs_3(window=100):
 			sys.exit()
 		r0[i] = line
 		line = ser.readline()
-		
+
+# def get_ice_cream()
+
+
+# given a car facing in the direction 0,1 on the point 0,0
+# def plot_traj(targ=[0,0],l_rad=10,r_rad=10): 

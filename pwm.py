@@ -41,4 +41,20 @@ while True:
         sleep(0.01)
         print(duty)
     sleep(0.5)
-    
+
+
+
+# # angle loc info (a_ prefix)
+# a_port = 0
+# a_ser = serial.Serial('/dev/ttyACM'+str(port),9600,timeout=5)#8,'N',1,timeout=1)
+
+# while True:
+# 	line = ser.readline()
+# 	if len(line) == 0:
+# 		print("Timeout")
+# 		sys.exit()
+# 	print(line)
+
+# # read from io and deplex and save to arrays
+# # 3 transmitter case
+
