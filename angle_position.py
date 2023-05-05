@@ -43,17 +43,17 @@ def get_pos_ang_3(r2,r3,r4,p2,p3,p4):
     a2 = get_ang_2(r3,r4)
     return calc_ang_pos(p2,p3,p4,a1,a2)
 
-def get_angle_arrs_3(window=100):
-	r0 = np.empty(window,dtype=int)
-	r1 = np.empty(window,dtype=int)
-	r2 = np.empty(window,dtype=int)
-	for (i=0;i<window;i+=1):
-		line = ser.readline()
-		if len(line) ==0:
-			print("angle receiver timeout")
-			sys.exit()
-		r0[i] = line
-		line = ser.readline()
+# def get_angle_arrs_3(window=100):
+#     r0 = np.empty(window,dtype=int)
+#     r1 = np.empty(window,dtype=int)
+#     r2 = np.empty(window,dtype=int)
+#     for (i=0;i<window;i+=1):
+#         line = ser.readline()
+#         if len(line) ==0:
+#             print("angle receiver timeout")
+#             sys.exit()
+#         r0[i] = line
+#         line = ser.readline()
 
 # def get_ice_cream()
 
