@@ -22,5 +22,5 @@ void setup() {
 
 void loop() {
   xbee.send(tx);
-  delay(10);
+  delay(30);
 }
