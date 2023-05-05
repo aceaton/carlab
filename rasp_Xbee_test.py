@@ -45,19 +45,21 @@ try:
     def packet_received_callback(packet):
         global i 
         global r2
+
         global r3
-        global idx2
+        global idx2 
         global idx3
         global arr_size
         i += 1
         start = time.time()
+        # print(packet)
         if i%1 == 0:
             packet_dict = packet.to_dict()
             api_data = packet_dict[DictKeys.FRAME_SPEC_DATA][DictKeys.API_DATA]
             rssi = api_data[DictKeys.RSSI]
             address16 = api_data[DictKeys.X16BIT_ADDR]
             end = time.time()
-            # print("from: {}, RSSI: {}, Iteration: {}, Time: {}".format(address16, rssi, i, end-start))
+            print("from: {}, RSSI: {}, Iteration: {}, Time: {}".format(address16, rssi, i, end-start))
             if (idx2<100):
                 print(idx2)
                 print("from: {}, RSSI: {}, Iteration: {}, Time: {}".format(address16, rssi, i, end-start))
@@ -77,7 +79,7 @@ try:
             i = 0
         #print(time.time() - start)
 
-    device.add_packet_received_callback(packet_received_callback)
+    device.add_packet_received_callback(packet_received_callback) 
 
     while(1):
         time.sleep(milli)
@@ -123,3 +125,20 @@ finally:
     if device is not None and device.is_open():
         device.close()
     
+
+
+    # def can_pwm():
+    #     global can_counter
+    #     while (1):
+    #         GPIO.output(canpin, GPIO.HIGH)
+    #         # if (can_counter < can_dc):
+    #         #     GPIO.output(canpin, GPIO.HIGH)
+    #         # else:
+    #         #     GPIO.output(canpin, GPIO.LOW)
+
+    #         print(can_counter)
+    #         can_counter = (can_counter+1)%100
+    
+    # can_thread = threading.Thread(target=can_pwm)
+    # can_thread.daemon = True
+    # can_thread.start()

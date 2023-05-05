@@ -29,9 +29,11 @@ it will require interrupts from the constant thread
 # generic stuff
 import logging, threading, time, atexit
 # custom stuff
-from angle_position import *
+# from angle_position import *
 from tof_position import *
 from position_utils import *
+
+import pigpio
 
 import serial
 import time
@@ -51,27 +53,42 @@ from _peak_finding import find_peaks
 import RPi.GPIO as GPIO
 from time import sleep
 
+pi = pigpio.pi()
+
 # CONFIGURE GPIO
-motorpin = 12                # PWM pin connected to LED
-GPIO.setwarnings(False)            #disable warnings
-GPIO.setmode(GPIO.BOARD)        #set pin numbering system
-GPIO.setup(motorpin,GPIO.OUT)
-pi_pwm = GPIO.PWM(motorpin,1000)        #create PWM instance with frequency
+# motorpin = 12    
+motorpin = 23            # PWM pin connected to LED
+# GPIO.setwarnings(False)            #disable warnings
+# GPIO.setmode(GPIO.BOARD)        #set pin numbering system
+# GPIO.setup(motorpin,GPIO.OUT)
+# pi_pwm = GPIO.PWM(motorpin,1000)        #create PWM instance with frequency
             #start PWM of required Duty Cycle 
-steerpin = 32
-GPIO.setup(steerpin,GPIO.OUT)
-steer_pwm = GPIO.PWM(steerpin,1000)
+pi.set_mode(motorpin, pigpio.OUTPUT)
+pi.set_PWM_frequency(motorpin,1000)
+# gpioSetPullUpDown(18, PI_PUD_DOWN);
+pi.set_pull_up_down(motorpin, pigpio.PUD_DOWN)
+
+steerpin = 13
+# GPIO.setup(steerpin,GPIO.OUT)
+# steer_pwm = GPIO.PWM(steerpin,1000)
+pi.set_mode(steerpin, pigpio.OUTPUT)
+pi.set_PWM_frequency(steerpin,1000)
 # FIGURE THIS OUT
-canpin = 15
-GPIO.setup(canpin,GPIO.OUT)
+canpin = 22
+pi.set_mode(canpin, pigpio.OUTPUT)
+pi.set_PWM_frequency(canpin,1000)
+
+
 # GPIO.output(canpin, GPIO.LOW)
 # can_pwm = GPIO.PWM(canpin,1000)
-halleff_in = 11
-GPIO.setup(halleff_in, GPIO.IN)#, pull_up_down=GPIO.PUD_UP)
+halleff_in = 17
+# GPIO.setup(halleff_in, GPIO.IN)#, pull_up_down=GPIO.PUD_UP)
 
 milli = 1e-3
 
 device = XBeeDevice("/dev/ttyS0", 9600)
+
+
 
 ser = serial.Serial(port="/dev/ttyACM0",baudrate=115200) # use dmesg to figure out USB
 
@@ -79,30 +96,33 @@ ser = serial.Serial(port="/dev/ttyACM0",baudrate=115200) # use dmesg to figure o
 clp = .5
 arr_size = 100 # must be divisible by 2
 # PID coefficients (sc = speed control, st = steering)
-sc_p = 60
-sc_i = 10
-sc_d = 5 # half as much?
+sc_p = .8
+sc_i = .05
+sc_d = 0 # half as much?
 st_p = 0.008
 st_i = 0
 st_d = 0.008
 # starting dcs
-sc_starting_dc = 8
-st_starting_dc = 6
-can_dc = 80
+sc_starting_dc = 10
+st_starting_dc = 15
+can_dc = 20
 # extreme dcs
-sc_max_dc = 65
+sc_max_dc = 100
 sc_min_dc = 0
 st_max_dc = 80
 st_min_dc = 0
 # speed control
 hes_per_foot = 7.5
-target_speed = 1 # in feet per second - sp=hes/second/7.5
+target_speed = 1# in feet per second - sp=hes/second/7.5
 # location stuff
 loc_find_delay = 100
 # location of transmitters (in feet units?)
-t2_location = [25,4]
-t3_location = [12,5]
-t4_location = [19,12]
+t2_location = [14,8]
+t3_location = [21,11]
+t4_location = [25,7]
+
+pwm_mult = 2.55
+# pwm_mult = 10000
 
 ''' GLOBAL VARIABLES (do change) ------------------------------------------------------------'''
 # stuff for array capturing
@@ -170,7 +190,7 @@ def threaded_receive_position():
                     pos_y = 3.28084*float(data[data.index("POS")+2])
                 buffer_string = lines[-1]           
 
-def halleff_callback(event):
+def halleff_callback(gpio,level,tick):
     # copy logic here
 
     # in the main func it's always doing the loc calc and pwm based on that at a regular interval
@@ -198,17 +218,19 @@ def halleff_callback(event):
     sc_int_err += err
     derr = err-sc_old_err
     sc_old_err = err
-    # print('speed: ' + str(1/(diff*hes_per_foot)) + ' err: ' + str(err) + ' interr: ' + str(sc_int_err) + ' derr: ' + str(derr))
-
+    print('speed: ' + str(1/(diff*hes_per_foot)) + ' err: ' + str(err) + ' interr: ' + str(sc_int_err) + ' derr: ' + str(derr))
+    
     # PID
     calculated_dc = sc_starting_dc - (sc_p*err + sc_i*sc_int_err + sc_d*derr)
     if (calculated_dc > sc_max_dc):
          calculated_dc = sc_max_dc
     if (calculated_dc < sc_min_dc):
          calculated_dc = sc_min_dc
+    print(calculated_dc)
     if (not arrived):
         # print(calculated_dc)
-        pi_pwm.ChangeDutyCycle(calculated_dc)
+        pi.set_PWM_dutycycle(motorpin, int(pwm_mult*calculated_dc))
+        # pi_pwm.ChangeDutyCycle(int(1000000*calculated_dc))
     
 def xbee_packet_received_callback(packet):
     global i 
@@ -271,23 +293,75 @@ def get_location_ang():
     array3_lock.acquire()
     array4_lock.acquire()
     idx = min([idx2,idx3,idx4])
-    r2_c = r2.copy(r2)
-    r3_c = r3.copy(r3)
-    r4_c = r4.copy(r4)
+    r2_c = np.copy(r2)
+    r3_c = np.copy(r3)
+    r4_c = np.copy(r4)
     array2_lock.release()
     array3_lock.release()
     array4_lock.release()
-    r2_d = r2_c[idx+1:]+r2_c[:idx]
-    r3_d = r3_c[idx+1:]+r3_c[:idx]
-    r4_d = r4_c[idx+1:]+r4_c[:idx]
+    r2_d = np.concatenate((r2_c[idx+1:],r2_c[:idx]))
+    r3_d = np.concatenate((r3_c[idx+1:],r3_c[:idx]))
+    r4_d = np.concatenate((r4_c[idx+1:],r4_c[:idx]))
     pos = get_pos_ang_3(r2_d,r3_d,r4_d,t2_location,t3_location,t4_location)
     return pos
 
+# using two numpy arrays of same len
+# gives t3 degrees clockwise from t2
+def get_ang_2(r2,r3):
+
+    # plt.close('all')
+    a = np.clip(r2,np.amin(r2),(np.amax(r2)-np.amin(r2))*clp+np.amin(r2))
+    b = np.clip(r3,np.amin(r3),(np.amax(r3)-np.amin(r3))*clp+np.amin(r3))
+    b2 = np.flip(b[:int(arr_size/2)])
+    r32 = np.flip(r3[:int(arr_size/2)])
+
+    filt=np.convolve(a,b2,mode='valid')#full')[45:105]#[int(arr_size/2):int(arr_size)]  
+    filt2=np.convolve(r2,r32,mode='valid')#[45:105]#[int(arr_size/2):int(arr_size)]  
+    
+    plt.figure(2)
+    plt.plot(r2,label='r2')
+    plt.plot(r3,label='r3')
+    # plt.plot(a,label='r2')
+    # plt.plot(b,label='r3')
+
+    # # plt.plot(np.flip(b[:int(arr_size/2)]))
+    plt.figure(0)
+    plt.plot(filt)
+    # plt.figure(1)
+    # plt.plot(filt2)
+    plt.show()
+    # print("PLOTTED")
+
+    ps1 = find_peaks(filt,distance=6,prominence=200)
+    ps = ps1[0]
+    # print(ps)
+    # ps = ps + len(b) - 1
+    # print(ps)
+    diff = np.mean(np.diff(ps))
+    # ps[1]-ps[0]
+    perc = 1-ps[0]/(diff)
+    # print('t3 is ' + str(()*360) + ' degrees clockwise from t2')
+    # print(ps1[1])
+    print(perc)
+    return perc*2*math.pi
+
+def get_pos_ang_3(r2,r3,r4,p2,p3,p4):
+    a1 = get_ang_2(r2,r3)
+    a2 = get_ang_2(r3,r4)
+    return calc_ang_pos(p2,p3,p4,a1,a2)
+
 ''' MAIN EXECUTION --------------------------------------------------------------------------'''
-def start_system(): # main func
-    pi_pwm.start(sc_starting_dc)
-    steer_pwm.start(st_starting_dc)
+def s(): # main func start syst
+    # pi_pwm.start(sc_starting_dc)
+    # steer_pwm.start(st_starting_dc)
+    pi.set_PWM_dutycycle(motorpin, int(pwm_mult*sc_starting_dc))
+    pi.set_PWM_dutycycle(steerpin, int(pwm_mult*st_starting_dc))
+    pi.set_PWM_dutycycle(canpin, int(pwm_mult*can_dc))
     # can_pwm.start(can_dc)
+
+    # pi.set_PWM_enabled(motorpin, True)
+    # pi.set_PWM_enabled(steerpin, True)
+    # pi.set_PWM_enabled(canpin, True)
     
     # Create a new thread object
     xbee_thread = threading.Thread(target=threaded_xbee_interface)
@@ -298,10 +372,12 @@ def start_system(): # main func
     uwb_thread.start()
     xbee_thread.start()
 
-    
-    GPIO.add_event_detect(halleff_in, GPIO.FALLING, callback=halleff_callback, bouncetime=200)
+    pi.set_glitch_filter(halleff_in,100)
+    pi.callback(halleff_in, pigpio.FALLING_EDGE, halleff_callback)
 
-def run_system():
+    # GPIO.add_event_detect(halleff_in, GPIO.FALLING, callback=halleff_callback, bouncetime=200)
+
+def r(): # run
     while (1):
         # loop in here for pid for location
         # do pid
@@ -342,7 +418,7 @@ def run_system():
              calculated_dc = st_min_dc
         
         if ( not arrived):
-            steer_pwm.ChangeDutyCycle(calculated_dc)
+            pi.set_PWM_dutycycle(steerpin, int(pwm_mult*calculated_dc))
 
         # pi_pwm.ChangeDutyCycle(duty) #provide duty cycle in the range 0-100
         time.sleep(milli*loc_find_delay)

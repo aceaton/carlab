@@ -1,6 +1,9 @@
 import trianglesolver
 from scipy.optimize import fsolve
 import math
+import numpy as np
+
+clp = .5
 
 # points as tuples, angles as radians
 def calc_ang_pos(pa,pb,pc,a1,a2):
@@ -26,7 +29,7 @@ def calc_ang_pos(pa,pb,pc,a1,a2):
     root = fsolve(func,[A/2,B/2,B/2,C/2,C/2,A/2])
 
     [ab,ba,bc,cb,ca,ac]=root
-    print(root)
+    # print(root)
 
     ra = trianglesolver.solve(A=ba,C=ab,b=d(pa,pb))[0]
     # rb = trianglesolver.solve(A=cb,C=bc,b=d(pc,pb))[0]
@@ -48,4 +51,23 @@ def d(A,B):
 def ang(A,B):
     return math.atan2(B[1]-A[1],B[0]-A[0])
 
-print(calc_ang_pos([0,4],[4,4],[2,0],math.pi*2/3,math.pi*2/3))
+# print(calc_ang_pos([0,4],[4,4],[2,0],math.pi*2/3,math.pi*2/3))
+
+
+# def get_angle_arrs_3(window=100):
+#     r0 = np.empty(window,dtype=int)
+#     r1 = np.empty(window,dtype=int)
+#     r2 = np.empty(window,dtype=int)
+#     for (i=0;i<window;i+=1):
+#         line = ser.readline()
+#         if len(line) ==0:
+#             print("angle receiver timeout")
+#             sys.exit()
+#         r0[i] = line
+#         line = ser.readline()
+
+# def get_ice_cream()
+
+
+# given a car facing in the direction 0,1 on the point 0,0
+# def plot_traj(targ=[0,0],l_rad=10,r_rad=10): 
